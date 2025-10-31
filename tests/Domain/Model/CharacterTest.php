@@ -3,8 +3,12 @@
 namespace Tests\Domain\Model;
 
 use PHPUnit\Framework\TestCase;
-use App\Domain\Model\Character; // まだ存在しない
-use App\Domain\Model\HitPoint;  // 既に実装済み
+use App\Domain\Model\Character;
+use App\Domain\Model\HitPoint;
+use App\Domain\Model\AttackPower;
+use App\Domain\Model\DefensePower;
+use App\Domain\Service\DamageCalculator;
+
 
 class CharacterTest extends TestCase
 {
@@ -16,10 +20,12 @@ class CharacterTest extends TestCase
     {
         $id = 'player-123';
         $name = '勇者';
+        $attackPower = new AttackPower(15);
+        $defensePower = new DefensePower(8);
         $hp = new HitPoint(100, 100);
 
         // 厳密なDDDでは、エンティティのIDは必須
-        $character = new Character($id, $name, $hp);
+        $character = new Character($id, $name, $hp, $attackPower, $defensePower);
 
         $this->assertSame($id, $character->getId());
         $this->assertSame($name, $character->getName());
@@ -34,7 +40,9 @@ class CharacterTest extends TestCase
     public function receiving_damage_should_reduce_hp_but_maintain_identity(): void
     {
         $hp = new HitPoint(100, 100);
-        $character = new Character('id-01', '敵スライム', $hp);
+        $attackPower = new AttackPower(15);
+        $defensePower = new DefensePower(8);
+        $character = new Character('id-01', '敵スライム', $hp, $attackPower, $defensePower);
 
         // ダメージを与える振る舞い
         $newCharacter = $character->receiveDamage(30);
@@ -48,17 +56,44 @@ class CharacterTest extends TestCase
 
     /**
      * @test
-     * HPが0以下になったとき、isAlive() が false を返すこと
+     * HPが0以下になったとき、isAbleToBattle() が false を返すこと
      */
-    public function character_should_be_dead_when_hp_reaches_zero(): void
+    public function character_should_be_unable_to_battle_when_hp_reaches_zero(): void
     {
         $hp = new HitPoint(10, 10);
-        $character = new Character('id-02', '瀕死の敵', $hp);
+        $attackPower = new AttackPower(15);
+        $defensePower = new DefensePower(8);
+        $character = new Character('id-02', '瀕死の敵', $hp, $attackPower, $defensePower);
         
         // 戦闘不能になるダメージ
         $character->receiveDamage(10); 
 
         $this->assertSame(0, $character->getCurrentHp());
         $this->assertFalse($character->isAbleToBattle());
+    }
+
+    /**
+     * @test
+     * 攻撃を行ったときに対象のHPが正しく変更されている
+     */
+    public function target_hp_should_be_decreased_when_character_atack(): void
+    {
+        $hp = new HitPoint(10, 10);
+        $attackPower = new AttackPower(15);
+        $defensePower = new DefensePower(8);
+        $character = new Character('id-03', 'attacker', $hp, $attackPower, $defensePower);
+
+        $targetHp = new HitPoint(100, 100);
+        $targetAttackPower = new AttackPower(11);
+        $targetDefensePower = new DefensePower(12);
+        $targetCharacter = new Character('id-04', 'target', $targetHp, $targetAttackPower, $targetDefensePower);
+        $calculator = new DamageCalculator();
+
+        // 攻撃を行う
+        $character->attack($targetCharacter, $calculator);
+
+        // 対象のHP = 攻撃される前のHP - (攻撃者の攻撃力 - 対象の防御力)
+        // 97 = 100 - (15 - 12)
+        $this->assertSame(97, $targetCharacter->getCurrentHp());
     }
 }

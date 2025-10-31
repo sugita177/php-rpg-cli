@@ -2,6 +2,8 @@
 
 namespace App\Domain\Model;
 
+use App\Domain\Service\DamageCalculator;
+
 // Characterはアグリゲートルート（エンティティ）であり、同一性を持つ
 class Character
 {
@@ -9,7 +11,9 @@ class Character
     public function __construct(
         private readonly string $id, // 永続的な同一性を保つためのID (read-only)
         private readonly string $name,
-        private HitPoint $hp // HPは振る舞いによって変更される可能性があるため、read-onlyではない
+        private HitPoint $hp, // HPは振る舞いによって変更される可能性があるため、read-onlyではない
+        private readonly AttackPower $attackPower,
+        private readonly DefensePower $defensePower,
     ) {}
 
     // 振る舞い 1: ダメージを受ける
@@ -46,5 +50,25 @@ class Character
     public function getCurrentHp(): int
     {
         return $this->hp->getCurrentValue();
+    }
+
+    public function getAttackPower(): AttackPower
+    {
+        return $this->attackPower;
+    }
+
+    public function getDefensePower(): DefensePower
+    {
+        return $this->defensePower;
+    }
+
+    public function attack(Character $target, DamageCalculator $calculator): void
+    {
+        $damage = $calculator->calculate(
+            $this->getAttackPower(),
+            $target->getDefensePower()
+        );
+
+        $target->receiveDamage($damage);
     }
 }
