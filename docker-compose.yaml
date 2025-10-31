@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  php-rpg-app:
+    # 依存関係として定義するDockerイメージの名前（Dockerfileでビルドする）
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # コンテナとホスト間のボリュームマウント（ソースコードの同期）
+    volumes:
+      - ./:/var/www/html
+      # - ./src:/var/www/html/src
+    # コンテナ起動時に自動実行するコマンドを定義
+    # この例では、PHPの対話モードでコンテナを起動し、コンテナ内に入ってからCLIコマンドを実行します。
+    # コンテナを終了させないために 'tail -f /dev/null' を使うのが一般的ですが、
+    # CLI実行専用なので、ユーザーの入力を待つ形で起動します。
+    tty: true
+    # コンテナ名（任意）
+    container_name: php-rpg-app

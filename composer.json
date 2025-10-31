@@ -1,0 +1,12 @@
+{
+    "name": "your-name/php-rpg-cli",
+    "description": "CLI RPG Battle System with PHP 8.4 and DDD",
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "require": {
+        "phpunit/phpunit": "^10.4"
+    }
+}
