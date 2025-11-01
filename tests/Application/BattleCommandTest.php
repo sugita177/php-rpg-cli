@@ -5,36 +5,81 @@ namespace Tests\Application;
 use PHPUnit\Framework\TestCase;
 use App\Application\BattleCommand;
 use App\Domain\Service\CombatService;
+use App\Domain\Repository\CharacterRepositoryInterface; // 新しい依存
+use App\Domain\Model\Character; // モックの戻り値用
+use App\Domain\Model\{HitPoint, AttackPower, DefensePower}; // モック用
 
 class BattleCommandTest extends TestCase
 {
+    private CombatService $mockCombatService;
+    private CharacterRepositoryInterface $mockRepository;
+
+    protected function setUp(): void
+    {
+        // 外部依存をモックで準備
+        $this->mockCombatService = $this->createMock(CombatService::class);
+        $this->mockRepository = $this->createMock(CharacterRepositoryInterface::class);
+    }
+
     /**
      * @test
-     * コマンドはCombatServiceを呼び出し、バトル結果を出力すべき
+     * コマンドはリポジトリから両方のキャラクターをロードし、CombatServiceを呼び出すべき
      */
-    public function command_should_call_combat_service_and_output_result(): void
+    public function command_should_load_characters_and_call_combat_service(): void
     {
-        // 1. 外部依存のモックアップ
-        
-        // 💡 CombatServiceのモック: 実際に戦闘ロジックを実行する代わりに、
-        // 呼び出しが行われたことだけを検証するためのダミーオブジェクト
-        $mockCombatService = $this->createMock(CombatService::class);
-        
-        // 💥 期待する動作を定義 💥
-        // execute()が呼び出されたことをアサートする
-        $mockCombatService->expects($this->once())
-                          ->method('executeAttack');
-        
-        // 2. コマンドの初期化
-        // 実際には、CLIからの入出力を担当するI/Oインターフェースも必要ですが、
-        // 今回はシンプルに、ドメインサービスへの依存のみを注入します。
-        $command = new BattleCommand($mockCombatService);
+        // 💡 ユーザー入力のシミュレーション
+        $attackerId = 'player-1';
+        $targetId = 'monster-1';
 
-        // 3. テストの実行
-        // 実際には、キャラクター情報（IDなど）を入力として受け取ります
-        $command->execute('player-1', 'monster-1');
+        // 💡 1. リポジトリのモック設定 (REDの状態を作るために重要なステップ)
+        // キャラクターのダミーオブジェクトを作成
+        $dummyAttacker = new Character($attackerId, 'A', new HitPoint(1, 1), new AttackPower(1), new DefensePower(1));
+        $dummyTarget = new Character($targetId, 'T', new HitPoint(1, 1), new AttackPower(1), new DefensePower(1));
+        
+        // リポジトリが find() されたら、上記ダミーオブジェクトを返すように設定
+        $this->mockRepository->expects($this->exactly(2))
+                             ->method('find')
+                             ->will($this->returnValueMap([
+                                 [$attackerId, $dummyAttacker],
+                                 [$targetId, $dummyTarget],
+                             ]));
 
-        // 💡 出力検証 (今回は一旦スキップし、ロジックの呼び出し検証に焦点を当てます)
-        // $this->assertStringContainsString('戦闘終了！', $output);
+        // 💡 2. CombatService のモック設定
+        // executeAttackが、上記ダミーオブジェクトを受け取って一度呼び出されることを期待
+        $this->mockCombatService->expects($this->once())
+                                ->method('executeAttack')
+                                ->with($dummyAttacker, $dummyTarget);
+        
+        // 3. コマンドの初期化と実行
+        $command = new BattleCommand($this->mockCombatService, $this->mockRepository);
+        $command->execute($attackerId, $targetId);
+    }
+
+    /**
+     * @test
+     * キャラクターが見つからない場合、コマンドはエラーを出力して終了すべき
+     */
+    public function command_should_exit_if_character_not_found(): void
+    {
+        // 攻撃者ID: 'missing-id'
+        // ターゲットID: 'monster-1'
+        $missingId = 'missing-id';
+        $targetId = 'monster-1';
+
+        // リポジトリが find() されたときに返す値を設定
+        $this->mockRepository->expects($this->exactly(2)) // 💥 期待呼び出し回数を 2 回に変更 💥
+                             ->method('find')
+                             ->will($this->returnValueMap([
+                                 [$missingId, null], // 1回目: Attackerはnull
+                                 [$targetId, null], // 2回目: Targetもnullを返す設定 (ここではどちらでも構いませんが、明示的に設定します)
+                             ]));
+        
+        // CombatServiceは呼び出されないことを期待 (nullが返されるため)
+        $this->mockCombatService->expects($this->never())
+                                ->method('executeAttack');
+
+        $command = new BattleCommand($this->mockCombatService, $this->mockRepository);
+        
+        $command->execute($missingId, $targetId); 
     }
 }

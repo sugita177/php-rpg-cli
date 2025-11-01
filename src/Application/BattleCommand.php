@@ -3,13 +3,18 @@
 namespace App\Application;
 
 use App\Domain\Service\CombatService;
-// 💡 今後、CharacterRepositoryInterface や Character も必要になりますが、
-// まずはテストを通すためにCombatServiceのみに焦点を当てます。
+use App\Domain\Repository\CharacterRepositoryInterface;
+
+// 💡 CLIからの入力を受け付ける機能は、executeメソッド内で STDIN/STDOUT を直接使うか、
+// Symfony ConsoleのようなフレームワークのInput/Outputインターフェースを導入するかの選択肢があります。
+// ここでは、executeに引数として渡されたIDを使うことで、テストの複雑化を防ぎます。
 
 class BattleCommand
 {
     public function __construct(
-        private readonly CombatService $combatService
+        private readonly CombatService $combatService,
+        // 💥 新しい依存性の注入 💥
+        private readonly CharacterRepositoryInterface $repository
     ) {}
 
     /**
@@ -17,18 +22,30 @@ class BattleCommand
      */
     public function execute(string $attackerId, string $targetId): void
     {
-        // 1. 💥 ここでリポジトリからエンティティを取得するロジックが必要だが、一旦スキップ 💥
-        //    (REDを回避するため、現在は直接モックされるCombatServiceの呼び出しのみ)
-        
-        // 2. ドメインサービスを呼び出す (テストで検証されるロジック)
-        // 💡 暫定措置: テストのモックに合わせるため、ダミー引数を渡す
-        $dummyAttacker = new \App\Domain\Model\Character($attackerId, 'A', new \App\Domain\Model\HitPoint(1, 1), new \App\Domain\Model\AttackPower(1), new \App\Domain\Model\DefensePower(1));
-        $dummyTarget = new \App\Domain\Model\Character($targetId, 'T', new \App\Domain\Model\HitPoint(1, 1), new \App\Domain\Model\AttackPower(1), new \App\Domain\Model\DefensePower(1));
+        // 1. リポジトリからエンティティを取得
+        $attacker = $this->repository->find($attackerId);
+        $target = $this->repository->find($targetId);
 
-        $this->combatService->executeAttack($dummyAttacker, $dummyTarget);
+        // 2. 存在チェック (ドメイン層にロジックを渡す前のアプリケーション層のガード)
+        if (!$attacker || !$target) {
+            echo "エラー: 攻撃者またはターゲットが見つかりません。\n";
+            return;
+        }
+
+        echo "--- バトル開始: {$attacker->getName()} vs {$target->getName()} ---\n";
+
+        // 3. ドメインサービスを呼び出す
+        $this->combatService->executeAttack($attacker, $target);
         
-        // 3. ユーザーに出力 (CLI表示ロジックは次のステップで実装)
-        echo "{$attackerId} が {$targetId} を攻撃しました。\n";
-        echo "戦闘フェーズが完了しました。\n";
+        // 4. バトル後の状態をリポジトリに保存 (永続化)
+        $this->repository->save($target);
+
+        // 5. ユーザーに出力
+        echo "{$attacker->getName()} は {$target->getName()} に攻撃しました。\n";
+        echo "{$target->getName()} の残りHP: {$target->getCurrentHp()}\n";
+        
+        if (!$target->isAbleToBattle()) {
+             echo "{$target->getName()} は倒れた！\n";
+        }
     }
 }
