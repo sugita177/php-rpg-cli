@@ -14,7 +14,7 @@ class AttackPower
         }
     }
 
-    // 💡 ゲッター
+    // ゲッター
     public function getValue(): int
     {
         return $this->value;
