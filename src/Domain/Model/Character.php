@@ -61,14 +61,4 @@ class Character
     {
         return $this->defensePower;
     }
-
-    public function attack(Character $target, DamageCalculator $calculator): void
-    {
-        $damage = $calculator->calculate(
-            $this->getAttackPower(),
-            $target->getDefensePower()
-        );
-
-        $target->receiveDamage($damage);
-    }
 }

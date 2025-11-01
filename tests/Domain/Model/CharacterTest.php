@@ -71,29 +71,4 @@ class CharacterTest extends TestCase
         $this->assertSame(0, $character->getCurrentHp());
         $this->assertFalse($character->isAbleToBattle());
     }
-
-    /**
-     * @test
-     * 攻撃を行ったときに対象のHPが正しく変更されている
-     */
-    public function target_hp_should_be_decreased_when_character_atack(): void
-    {
-        $hp = new HitPoint(10, 10);
-        $attackPower = new AttackPower(15);
-        $defensePower = new DefensePower(8);
-        $character = new Character('id-03', 'attacker', $hp, $attackPower, $defensePower);
-
-        $targetHp = new HitPoint(100, 100);
-        $targetAttackPower = new AttackPower(11);
-        $targetDefensePower = new DefensePower(12);
-        $targetCharacter = new Character('id-04', 'target', $targetHp, $targetAttackPower, $targetDefensePower);
-        $calculator = new DamageCalculator();
-
-        // 攻撃を行う
-        $character->attack($targetCharacter, $calculator);
-
-        // 対象のHP = 攻撃される前のHP - (攻撃者の攻撃力 - 対象の防御力)
-        // 97 = 100 - (15 - 12)
-        $this->assertSame(97, $targetCharacter->getCurrentHp());
-    }
 }
